@@ -79,6 +79,18 @@ static struct clk usart3_clk = {
 	.type		= CLK_TYPE_PERIPHERAL,
 	.div		= AT91_PMC_PCR_DIV2,
 };
+static struct clk uart0_clk = {
+	.name		= "uart0_clk",
+	.pid		= SAMA5D3_ID_UART0,
+	.type		= CLK_TYPE_PERIPHERAL,
+	.div		= AT91_PMC_PCR_DIV2,
+};
+static struct clk uart1_clk = {
+	.name		= "uart1_clk",
+	.pid		= SAMA5D3_ID_UART1,
+	.type		= CLK_TYPE_PERIPHERAL,
+	.div		= AT91_PMC_PCR_DIV2,
+};
 static struct clk twi0_clk = {
 	.name		= "twi0_clk",
 	.pid		= SAMA5D3_ID_TWI0,
@@ -165,13 +177,13 @@ static struct clk udphs_clk = {
 	.pid		= SAMA5D3_ID_UDPHS,
 	.type		= CLK_TYPE_PERIPHERAL,
 };
-/* gmac only for sama5d33, sama5d34, sama5d35 */
+/* gmac only for sama5d33, sama5d34, sama5d35, sama5d36 */
 static struct clk macb0_clk = {
 	.name		= "macb0_clk",
 	.pid		= SAMA5D3_ID_GMAC,
 	.type		= CLK_TYPE_PERIPHERAL,
 };
-/* emac only for sama5d31, sama5d35 */
+/* emac only for sama5d31, sama5d35, sama5d36 */
 static struct clk macb1_clk = {
 	.name		= "macb1_clk",
 	.pid		= SAMA5D3_ID_EMAC,
@@ -183,7 +195,7 @@ static struct clk lcdc_clk = {
 	.pid		= SAMA5D3_ID_LCDC,
 	.type		= CLK_TYPE_PERIPHERAL,
 };
-/* isi only for sama5d33, sama5d35 */
+/* isi only for sama5d33, sama5d35, sama5d36 */
 static struct clk isi_clk = {
 	.name		= "isi_clk",
 	.pid		= SAMA5D3_ID_ISI,
@@ -240,6 +252,8 @@ static struct clk *periph_clocks[] __initdata = {
 	&usart1_clk,
 	&usart2_clk,
 	&usart3_clk,
+	&uart0_clk,
+	&uart1_clk,
 	&twi0_clk,
 	&twi1_clk,
 	&twi2_clk,
@@ -298,6 +312,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
 	CLKDEV_CON_DEV_ID("usart", "f0020000.serial", &usart1_clk),
 	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart2_clk),
 	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart3_clk),
+	CLKDEV_CON_DEV_ID("usart", "f0024000.serial", &uart0_clk),
+	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &uart1_clk),
 	CLKDEV_CON_DEV_ID(NULL, "f0014000.i2c", &twi0_clk),
 	CLKDEV_CON_DEV_ID(NULL, "f0018000.i2c", &twi1_clk),
 	CLKDEV_CON_DEV_ID(NULL, "f801c000.i2c", &twi2_clk),
@@ -341,11 +357,13 @@ static void __init sama5d3_register_clocks(void)
 
 	if ( cpu_is_sama5d33()
 	|| cpu_is_sama5d34()
-	|| cpu_is_sama5d35() )
+	|| cpu_is_sama5d35()
+	|| cpu_is_sama5d36())
 		clk_register(&macb0_clk);
 
 	if ( cpu_is_sama5d31()
-	|| cpu_is_sama5d35() )
+	|| cpu_is_sama5d35()
+	|| cpu_is_sama5d36())
 		clk_register(&macb1_clk);
 
 	if (!cpu_is_sama5d35())

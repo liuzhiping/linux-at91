@@ -38,6 +38,7 @@
 #define MOSCRDY_TIMEOUT 	1000
 #define PLLALOCK_TIMEOUT	1000
 #define PLLBLOCK_TIMEOUT	1000
+#define UPLLLOCK_TIMEOUT	1000
 
 pmc	.req	r0
 sdramc	.req	r1
@@ -100,6 +101,77 @@ tmp2	.req	r5
 	tst	tmp1, #AT91_PMC_LOCKB
 	beq	1b
 2:
+	.endm
+
+/*
+ * Wait until UTMI PLL has locked.
+ */
+	.macro wait_uplllock
+	mov	tmp2, #UPLLLOCK_TIMEOUT
+1:	sub	tmp2, tmp2, #1
+	cmp	tmp2, #0
+	beq	2f
+	ldr	tmp1, [pmc, #AT91_PMC_SR]
+	tst	tmp1, #AT91_PMC_LOCKU
+	beq	1b
+2:
+	.endm
+
+/*
+ * Put the processor to enter into Standby mode, wait for interrupt to wakeup
+ */
+	.macro _do_wfi
+
+#if defined(CONFIG_CPU_V7)
+	/*
+	 * Excute ISB instruction flushed the pipeline in the processor,
+	 * so that all instructions that come after the ISB instruction
+	 * in program order are fetched from cache or memory.
+	 */
+	isb
+
+	/*
+	 * Execute a barrier instruction to ensure that all cache,
+	 * TLB and branch predictor maintenance operations issued
+	 * by any CPU in the cluster have completed.
+	 */
+	dsb
+	dmb
+
+	/*
+	 * AT91 PMC: Switch off Processor Clock
+	 *
+	 */
+	mov	tmp1, #AT91_PMC_PCK
+	str	tmp1, [pmc, #AT91_PMC_SCDR]
+
+	/*
+	 * Execute a WFI instruction and wait until the
+	 * STANDBYWFI output is asserted to indicate that the
+	 * CPU is in idle and low power state. CPU can specualatively
+	 * prefetch the instructions so add NOPs after WFI
+	 */
+	wfi		@ Wait For Interrupt
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+#else
+	mcr	p15, 0, tmp1, c7, c0, 4
+#endif
+
 	.endm
 
 	.text
@@ -207,6 +279,10 @@ sdr_sr_done:
 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
 
+	/* Disable DDRCK (SAMA5D3) */
+	mov 	tmp1, #(1 << 2)
+	str	tmp1, [pmc, #AT91_PMC_SCDR]
+
 	/* Save PLLB setting and disable it */
 	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
 	str	tmp1, .saved_pllbr
@@ -214,17 +290,24 @@ sdr_sr_done:
 	mov	tmp1, #AT91_PMC_PLLCOUNT
 	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
 
+	/* Disable UTMI PLL */
+	ldr	tmp1, [pmc, #AT91_CKGR_UCKR]
+	bic	tmp1, tmp1, #AT91_PMC_UPLLEN
+	str	tmp1, [pmc, #AT91_CKGR_UCKR]
+
 	/* Turn off the main oscillator */
 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
 	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+	orr	tmp1, tmp1, #AT91_PMC_KEY
 	str	tmp1, [pmc, #AT91_CKGR_MOR]
 
 	/* Wait for interrupt */
-	mcr	p15, 0, tmp1, c7, c0, 4
+	_do_wfi
 
 	/* Turn on the main oscillator */
 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
 	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+	orr	tmp1, tmp1, #AT91_PMC_KEY
 	str	tmp1, [pmc, #AT91_CKGR_MOR]
 
 	wait_moscrdy
@@ -241,6 +324,17 @@ sdr_sr_done:
 	wait_pllblock
 2:
 
+	/* Turn on UTMI PLL */
+	ldr	tmp1, [pmc, #AT91_CKGR_UCKR]
+	orr	tmp1, tmp1, #AT91_PMC_UPLLEN
+	str	tmp1, [pmc, #AT91_CKGR_UCKR]
+
+	wait_uplllock
+
+	/* Enable DDRCK (SAMA5D3) */
+	mov 	tmp1, #(1 << 2)
+	str	tmp1, [pmc, #AT91_PMC_SCER]
+
 	/* Restore PLLA setting */
 	ldr	tmp1, .saved_pllar
 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
@@ -252,7 +346,6 @@ sdr_sr_done:
 3:
 	wait_pllalock
 4:
-
 #ifdef SLOWDOWN_MASTER_CLOCK
 	/*
 	 * First set PRES if it was not 0,

@@ -42,7 +42,17 @@
 		};
 	};
 
+	leds {
+		d3 {
+			label = "d3";
+			gpios = <&pioE 24 0>;
+		};
+	};
+
 	sound {
 		status = "okay";
 	};
 };
+
+/* Uncomment following line will enable ISI support */
+/* /include/ "sama5d3mb_isi.dtsi" */
